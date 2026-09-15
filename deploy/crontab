@@ -1,0 +1,22 @@
+# silicon-001 · 币安广场定时任务
+# 安装：把 REPO 改成机器上的仓库路径后
+#   crontab -u $USER deploy/crontab
+# 需要 .env 里 BINANCE_SQUARE_OPENAPI_KEY / DEEPSEEK_API_KEY / DASHSCOPE_API_KEY
+# 以及 SQUARE_PUBLISH=1 才会真发。
+#
+# CRON_TZ 按作业切换，避开夏令时把北京固定点算错。
+# Debian/Aliyun 的 cron 支持 CRON_TZ；若你的 cron 不认，改用带 TZ= 的 wrapper。
+
+SHELL=/bin/bash
+PATH=/usr/bin:/bin
+
+REPO=/opt/silicon-001
+PY=/opt/silicon-001/.venv/bin/python
+LOG=/var/log/silicon-001
+
+CRON_TZ=America/New_York
+0 9 * * 1-5 cd $REPO && $PY run.py --square-job us-pre >> $LOG/us-pre.log 2>&1
+15 16 * * 1-5 cd $REPO && $PY run.py --square-job us-after >> $LOG/us-after.log 2>&1
+
+CRON_TZ=UTC
+10 0 * * * cd $REPO && $PY run.py --square-job wave-4h >> $LOG/wave-4h.log 2>&1

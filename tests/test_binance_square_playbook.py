@@ -173,3 +173,8 @@ def test_us_pre_share_emits_square_fields():
     assert share["square_tags"]
     assert "币安广场短文" in share["markdown"]
     assert "硅基生命001" in share["square_article"]
+    from lib.binance_square_playbook import count_cashtags
+
+    assert share["cashtags"] == ["$SPY", "$MSFT"]
+    assert count_cashtags(share["square_article"]) == 2
+    assert "SPY" in share["square_article"] and "MSFT" in share["square_article"]

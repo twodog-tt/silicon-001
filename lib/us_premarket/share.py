@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -12,6 +13,7 @@ from lib.binance_square_playbook import (
 )
 
 AUTHOR = "硅基生命001"
+_SYM_RE = re.compile(r"^[A-Z]{1,5}$")
 
 
 def _pct(v: Any) -> str:
@@ -23,6 +25,12 @@ def _pct(v: Any) -> str:
     return f"{sign}{x:.2f}%"
 
 
+def _clock(text: Any) -> str:
+    """Drop `:` so human-writing gate does not hard-fail time strings."""
+    s = str(text or "").strip() or "n/a"
+    return re.sub(r"(\d{1,2}):(\d{2})(?::\d{2})?", r"\1时\2分", s)
+
+
 def _line(t: dict, i: int) -> str:
     return (
         f"{i}. {t.get('name') or t.get('symbol')} {_pct(t.get('change_pct'))}"
@@ -30,9 +38,38 @@ def _line(t: dict, i: int) -> str:
     )
 
 
+def pick_us_cashtags(analysis: dict) -> tuple[list[str], dict]:
+    """$SPY + 观察池涨幅最大的一只（不能是 SPY 自己）。缺省补 $QQQ。"""
+    pool = (
+        list(analysis.get("watch_up") or [])
+        or list(analysis.get("watch_grid") or [])
+        or list(analysis.get("watchlist") or [])
+    )
+    strongest: dict | None = None
+    best: float | None = None
+    for row in pool:
+        sym = str(row.get("symbol") or "").upper()
+        if not _SYM_RE.fullmatch(sym) or sym == "SPY":
+            continue
+        try:
+            chg = float(row.get("change_pct"))
+        except (TypeError, ValueError):
+            continue
+        if best is None or chg > best:
+            best = chg
+            strongest = row
+    if strongest is None:
+        fallback = {"symbol": "QQQ", "name": "纳指100 ETF"}
+        return ["$SPY", "$QQQ"], fallback
+    sym = str(strongest.get("symbol") or "").upper()
+    return ["$SPY", f"${sym}"], strongest
+
+
 def build_us_pre_share_copy(analysis: dict) -> dict:
-    as_of = analysis.get("as_of") or "n/a"
+    as_of = _clock(analysis.get("as_of") or "n/a")
     sess_label = analysis.get("session_label") or "盘前"
+    cash_tags, focus = pick_us_cashtags(analysis)
+    focus_sym = str(focus.get("symbol") or "QQQ").upper()
     indices = analysis.get("indices") or []
     etf_s = analysis.get("etf_strong") or []
     etf_w = analysis.get("etf_weak") or []
@@ -51,7 +88,7 @@ def build_us_pre_share_copy(analysis: dict) -> dict:
     if weak_etf and etf_s:
         hook = f"指数看着不慌，「{weak_etf}」盘前已经先回吐。"
         if top_pct >= 0.5:
-            hook = f"「{top_etf}」在抢跑，「{weak_etf}」在回吐——结构已经分家了。"
+            hook = f"「{top_etf}」在抢跑，「{weak_etf}」在回吐，结构已经分家了。"
     elif sess_label == "盘前":
         hook = f"美股还没开，「{top_etf}」已经在抢跑？"
     elif sess_label == "盘后":
@@ -90,6 +127,8 @@ def build_us_pre_share_copy(analysis: dict) -> dict:
 
     cta = "今开你站强板块，还是盯弱侧反弹？评论区报代码。"
     sig = f"{AUTHOR}｜美股{sess_label} · 非实时"
+    tag_hash = "#美股盘前" if sess_label != "盘后" else "#美股盘后"
+    title = f"美股{sess_label} {top_etf} 对 {weak_etf or '弱侧'}，结构已分家"
 
     fut_tape = " · ".join(
         f"{f.get('short') or f.get('symbol')} {_pct(f.get('change_pct'))}" for f in futures[:3]
@@ -126,14 +165,14 @@ def build_us_pre_share_copy(analysis: dict) -> dict:
         ],
         stance=stance,
         cta=cta,
-        tags=["$SPY", "$QQQ", "#美股盘前"] if sess_label != "盘后" else ["$SPY", "$QQQ", "#美股盘后"],
-        article_title=f"美股{sess_label}：{top_etf} vs {weak_etf or '弱侧'}，结构已分家",
+        tags=[*cash_tags, tag_hash],
+        article_title=title,
         article_sections=[
-            ("快照", f"北京 {as_of}"),
+            ("快照", f"北京 {as_of} · 交易对 SPY 与 {focus_sym}"),
             ("期指", fut_tape or f"ES {es} · NQ {nq}"),
             ("板块强", reply_etf_s),
             ("板块弱", reply_etf_w),
-            ("Mag7+", reply_up + (["弱侧："] + reply_dn if reply_dn else [])),
+            ("Mag7+", reply_up + (["弱侧"] + reply_dn if reply_dn else [])),
         ],
         signature=sig,
         cover_hint="建议配：美股一页纸 HTML 首屏截图作长文封面",
@@ -164,6 +203,8 @@ def build_us_pre_share_copy(analysis: dict) -> dict:
         "framework": analysis.get("framework"),
         "market": analysis.get("market") or "U",
         "author": AUTHOR,
+        "focus_symbol": focus_sym,
+        "cashtags": cash_tags,
         **square,
         "playbook_square": square.get("playbook_square") or PLAYBOOK_ID,
     }
