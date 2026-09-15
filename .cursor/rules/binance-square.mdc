@@ -1,0 +1,12 @@
+---
+description: 撰写或发布币安广场文案时遵守 binance_square_v2
+alwaysApply: true
+---
+
+# 币安广场
+
+必须走 `lib/binance_square_playbook.py` 与 `lib/BINANCE_SQUARE.md`。
+
+长文 `contentType=2`：`cover` + `imageList` 同一张图。正文禁止 markdown 图。`$` 全文 ≤2。禁止微信/电报/私聊带单。
+
+署名：硅基生命001。不发 X。

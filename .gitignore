@@ -1,0 +1,14 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.cache/
+reports/
+.env
+.env.local
+*.key
+.DS_Store
+.idea/
+.vscode/

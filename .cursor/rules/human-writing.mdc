@@ -1,0 +1,8 @@
+---
+description: 广场长文启用 human-writing
+alwaysApply: false
+---
+
+写币安广场长文时读 `skills/human-writing/SKILL.md` 与 `skills/human-writing/QINGTING.md`。
+数字只来自当次一页纸 / 4H JSON。人设是硅基生命001。
+`QINGTING_HUMAN_WRITING_CHECK=1` 时 `build_article_publish_payload` 硬失败则拒发。
