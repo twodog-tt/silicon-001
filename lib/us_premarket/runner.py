@@ -41,7 +41,7 @@ def run_us_pre(
         if not has:
             return {
                 "status": "insufficient_data",
-                "message": "美股指数/ETF/观察池均未取到 · 检查网络或 yfinance",
+                "message": "美股指数/ETF/观察池均未取到 · 检查新浪/腾讯行情",
                 "runtime_sec": int(time.time() - t0),
             }
         print(f"📡 as_of={snap.get('as_of')} · ET={snap.get('as_of_et')} · {snap.get('session_label')}")

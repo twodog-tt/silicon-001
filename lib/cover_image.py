@@ -9,6 +9,8 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
+from lib.http_proxy import urlopen_direct
+
 DASHSCOPE_BASE = "https://dashscope.aliyuncs.com/api/v1"
 DEFAULT_MODEL = "qwen-image-plus"
 DEFAULT_SIZE = "1280*720"
@@ -39,7 +41,7 @@ def _post(url: str, body: dict, headers: dict[str, str], *, timeout: int = 120) 
         method="POST",
     )
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
+        with urlopen_direct(req, timeout=timeout) as resp:
             raw = resp.read().decode("utf-8", errors="replace")
     except urllib.error.HTTPError as exc:
         detail = exc.read().decode("utf-8", errors="replace")
@@ -52,7 +54,7 @@ def _post(url: str, body: dict, headers: dict[str, str], *, timeout: int = 120) 
 
 def _get(url: str, headers: dict[str, str], *, timeout: int = 60) -> dict[str, Any]:
     req = urllib.request.Request(url, headers=headers, method="GET")
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
+    with urlopen_direct(req, timeout=timeout) as resp:
         return json.loads(resp.read().decode("utf-8", errors="replace"))
 
 
@@ -94,7 +96,7 @@ def _url_from_content(content: Any) -> str | None:
 def _download(url: str, dest: Path) -> Path:
     dest.parent.mkdir(parents=True, exist_ok=True)
     req = urllib.request.Request(url, method="GET")
-    with urllib.request.urlopen(req, timeout=120) as resp:
+    with urlopen_direct(req, timeout=120) as resp:
         dest.write_bytes(resp.read())
     if dest.stat().st_size < 32:
         raise RuntimeError("downloaded cover is empty")

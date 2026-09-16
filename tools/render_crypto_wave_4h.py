@@ -465,10 +465,15 @@ def render_one(ticker: str, *, fetch: bool = True) -> Path:
     (out / "structure-wave-4h.json").write_text(
         json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
     )
-    html = _write_html(out, payload, png)
+    try:
+        html = _write_html(out, payload, png)
+        html_name = html.name
+    except Exception as exc:
+        print(f"[warn] HTML skip ({type(exc).__name__}: {exc})")
+        html_name = "(skipped)"
     print(f"[ok] {ticker} 4H wave → {out}")
     print(f"     png  {png.name}")
-    print(f"     html {html.name}")
+    print(f"     html {html_name}")
     print(f"     last={payload['last_price']} primary={prim.get('pattern')} / {prim.get('label')}")
     return out
 

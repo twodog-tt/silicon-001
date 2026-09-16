@@ -1,4 +1,4 @@
-"""美股盘前快照 · yfinance 主源 · TTL 缓存 · akshare 兜底."""
+"""美股盘前快照 · 新浪/腾讯主源 · 可选 yfinance · TTL 缓存."""
 from __future__ import annotations
 
 import json
@@ -10,6 +10,7 @@ from typing import Any, Callable
 from zoneinfo import ZoneInfo
 
 from lib.us_premarket import FRAMEWORK, MARKET
+from lib.us_premarket.cn_quotes import fetch_sina_quotes, fetch_tencent_quotes
 
 SCRIPTS_DIR = Path(__file__).resolve().parents[2]
 CACHE_ROOT = SCRIPTS_DIR / ".cache" / "us_premarket"
@@ -60,6 +61,11 @@ WATCHLIST = {
 
 def _no_cache() -> bool:
     return os.environ.get("STOCK_NO_CACHE") == "1" or os.environ.get("US_PRE_NO_CACHE") == "1"
+
+
+def _yf_enabled() -> bool:
+    """Yahoo 在国内 ECS 通常不可达，默认关闭以免 cron 卡死."""
+    return (os.environ.get("US_PRE_YF") or "").strip().lower() in ("1", "true", "yes")
 
 
 def _f(v: Any, default: float | None = None) -> float | None:
@@ -306,13 +312,45 @@ def fetch_us_pre_snapshot(*, force: bool = False) -> dict[str, Any]:
     quotes: dict[str, dict] = {}
     try:
         quotes = _cached_call(
-            "yf_quotes_bundle",
-            lambda: _fetch_yf_quotes(all_syms, prefer_pre=prefer_pre),
+            "cn_quotes_bundle",
+            lambda: fetch_sina_quotes(all_syms, prefer_pre=prefer_pre),
             force=force,
         ) or {}
-        sources.append("yfinance")
+        if quotes:
+            sources.append("sina")
     except Exception as e:  # noqa: BLE001
-        warnings.append(f"yfinance 失败: {type(e).__name__}")
+        warnings.append(f"sina 失败: {type(e).__name__}")
+
+    missing = [s for s in all_syms if not (quotes.get(s) or {}).get("price")]
+    if missing:
+        try:
+            extra = fetch_tencent_quotes(missing, prefer_pre=prefer_pre)
+            for sym, row in extra.items():
+                if (row.get("price") is not None or row.get("change_pct") is not None) and not (
+                    quotes.get(sym) or {}
+                ).get("price"):
+                    quotes[sym] = row
+            if extra:
+                sources.append("tencent")
+        except Exception as e:  # noqa: BLE001
+            warnings.append(f"tencent 失败: {type(e).__name__}")
+
+    still = [s for s in all_syms if not (quotes.get(s) or {}).get("price")]
+    if still and _yf_enabled():
+        try:
+            yf_q = _cached_call(
+                "yf_quotes_bundle",
+                lambda: _fetch_yf_quotes(still, prefer_pre=prefer_pre),
+                force=force,
+            ) or {}
+            for sym, row in yf_q.items():
+                if row.get("price") is not None or row.get("change_pct") is not None:
+                    quotes[sym] = row
+            sources.append("yfinance")
+        except Exception as e:  # noqa: BLE001
+            warnings.append(f"yfinance 失败: {type(e).__name__}")
+    elif still and not _yf_enabled():
+        warnings.append(f"缺 {len(still)} 个标的（未开 US_PRE_YF）")
 
     indices = []
     for sym, meta in INDEX_SYMBOLS.items():

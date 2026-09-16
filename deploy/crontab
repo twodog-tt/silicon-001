@@ -1,11 +1,10 @@
 # silicon-001 · 币安广场定时任务
-# 安装：把 REPO 改成机器上的仓库路径后
-#   crontab -u $USER deploy/crontab
-# 需要 .env 里 BINANCE_SQUARE_OPENAPI_KEY / DEEPSEEK_API_KEY / DASHSCOPE_API_KEY
-# 以及 SQUARE_PUBLISH=1 才会真发。
+# Ubuntu 用户 crontab 经常忽略 CRON_TZ（新加坡这台机就是）。优先：
+#   sudo bash deploy/install-timers.sh /home/admin/silicon-001
+# 仍用 cron 时，时间必须按「机器本地时区」换算，不能假设 CRON_TZ 生效。
 #
-# CRON_TZ 按作业切换，避开夏令时把北京固定点算错。
-# Debian/Aliyun 的 cron 支持 CRON_TZ；若你的 cron 不认，改用带 TZ= 的 wrapper。
+# 需要 .env 里 BINANCE_SQUARE_OPENAPI_KEY / DEEPSEEK_API_KEY
+# 以及 SQUARE_PUBLISH=1 才会真发。
 
 SHELL=/bin/bash
 PATH=/usr/bin:/bin

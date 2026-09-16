@@ -15,6 +15,7 @@ from lib.binance_square_playbook import (
     strip_markdown_images,
     validate_square_text,
 )
+from lib.http_proxy import urlopen_direct
 
 DEEPSEEK_URL = "https://api.deepseek.com/chat/completions"
 DEFAULT_MODEL = "deepseek-flash"
@@ -102,7 +103,7 @@ def rewrite_square_article(
         method="POST",
     )
     try:
-        with urllib.request.urlopen(req, timeout=90) as resp:
+        with urlopen_direct(req, timeout=90) as resp:
             raw = resp.read().decode("utf-8", errors="replace")
         obj = json.loads(raw)
         text = (

@@ -1,0 +1,11 @@
+[Unit]
+Description=silicon-001 US after-hours Square post (16:15 America/New_York)
+
+[Timer]
+OnCalendar=Mon..Fri *-*-* 16:15:00 America/New_York
+Persistent=true
+AccuracySec=30s
+Unit=silicon-square@us-after.service
+
+[Install]
+WantedBy=timers.target

@@ -126,16 +126,19 @@ def test_llm_copy_falls_back_without_key(monkeypatch):
     assert out["body"].startswith("结构图见封面")
 
 
-def test_cover_fallback_uses_local_png(tmp_path, monkeypatch):
+def test_cover_uses_chart_png_by_default(tmp_path, monkeypatch):
     import lib.square_jobs as jobs
 
     fallback = tmp_path / "wave.png"
     fallback.write_bytes(b"png-bytes")
     dest = tmp_path / "cover.png"
+    called = {"n": 0}
 
     def _boom(*_a, **_k):
-        raise RuntimeError("no dashscope")
+        called["n"] += 1
+        raise RuntimeError("dashscope should not run")
 
+    monkeypatch.delenv("SQUARE_AI_COVER", raising=False)
     monkeypatch.setattr(jobs, "generate_cover_png", _boom)
     got = jobs._resolve_cover(
         dest=dest,
@@ -144,7 +147,9 @@ def test_cover_fallback_uses_local_png(tmp_path, monkeypatch):
         fact="test",
         fallback=fallback,
     )
-    assert got == fallback
+    assert got == dest
+    assert dest.read_bytes() == b"png-bytes"
+    assert called["n"] == 0
 
 
 def test_us_job_dry_run_does_not_publish(tmp_path, monkeypatch):

@@ -1,0 +1,16 @@
+[Unit]
+Description=silicon-001 Square job (%i)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=admin
+Group=admin
+WorkingDirectory=/home/admin/silicon-001
+ExecStart=/home/admin/silicon-001/.venv/bin/python run.py --square-job %i
+StandardOutput=append:/home/admin/silicon-001/logs/%i.log
+StandardError=append:/home/admin/silicon-001/logs/%i.log
+
+[Install]
+WantedBy=multi-user.target

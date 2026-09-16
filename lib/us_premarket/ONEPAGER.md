@@ -17,7 +17,7 @@ CLI：`python run.py --us-pre` · 环境变量 `US_PRE_CACHE_TTL` / `US_PRE_NO_C
 
 ## 数据纪律
 
-- 主源 yfinance；可选 sina 指数兜底
+- 主源新浪 `hq.sinajs.cn`（必须带 Referer）+ 腾讯兜底；`US_PRE_YF=1` 才尝试 Yahoo
 - 盘前：现金指数 `prior_close`；期货 `overnight`；个股/ETF 优先 `premarket`
 - 弱势侧禁止混入上涨标的
 - 缺字段显示 `—`，禁止伪造 0

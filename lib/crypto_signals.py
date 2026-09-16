@@ -3,7 +3,7 @@
 Design:
 - No hard deps on pycoingecko / ccxt — raw ``requests`` only.
 - Spot ticker / K-line / funding: OKX + Binance public REST.
-  Default primary = OKX; on failure fall back to the other.
+  Default primary = Binance（国内走 data-api.binance.vision，主站 api.binance.com 常不可达）.
   Force primary via ``QINGTING_CRYPTO_MARKET_SOURCE=okx|binance``.
 - Optional: CoinGecko (mcap / ATH / supply / dominance) when reachable.
 - Sentiment: alternative.me Fear & Greed + perpetual funding (OKX/Binance).
@@ -29,6 +29,15 @@ _CHROME_UA = (
 )
 
 MarketSource = Literal["okx", "binance"]
+
+# 国内 ECS 测通：data-api.binance.vision；api.binance.com / fapi / OKX 常超时
+_BINANCE_SPOT_BASES = (
+    "https://data-api.binance.vision",
+    "https://api.binance.com",
+)
+_BINANCE_FAPI_BASES = (
+    "https://fapi.binance.com",
+)
 
 # Canonical symbol → ids / exchange instruments
 _CRYPTO_META: dict[str, dict[str, str]] = {
@@ -111,10 +120,26 @@ def crypto_meta(code: str) -> dict[str, str] | None:
 
 def crypto_market_source_pref() -> MarketSource:
     """Preferred primary exchange for ticker/klines/funding."""
-    raw = (os.environ.get("QINGTING_CRYPTO_MARKET_SOURCE") or "okx").strip().lower()
-    if raw in ("binance", "bn", "bnb"):
-        return "binance"
-    return "okx"
+    raw = (os.environ.get("QINGTING_CRYPTO_MARKET_SOURCE") or "binance").strip().lower()
+    if raw in ("okx",):
+        return "okx"
+    return "binance"
+
+
+def binance_spot_bases() -> list[str]:
+    env = (os.environ.get("BINANCE_API_BASE") or "").strip().rstrip("/")
+    bases = list(_BINANCE_SPOT_BASES)
+    if env:
+        return [env] + [b for b in bases if b != env]
+    return bases
+
+
+def binance_fapi_bases() -> list[str]:
+    env = (os.environ.get("BINANCE_FAPI_BASE") or "").strip().rstrip("/")
+    bases = list(_BINANCE_FAPI_BASES)
+    if env:
+        return [env] + [b for b in bases if b != env]
+    return bases
 
 
 def _market_source_order() -> list[MarketSource]:
@@ -179,7 +204,7 @@ def _okx_ticker(inst_id: str) -> dict:
     j = _get_json(
         "https://www.okx.com/api/v5/market/ticker",
         params={"instId": inst_id},
-        timeout=15,
+        timeout=8,
     )
     rows = (j or {}).get("data") or []
     return rows[0] if rows else {}
@@ -189,7 +214,7 @@ def _okx_candles(inst_id: str, bar: str = "1D", limit: int = 120) -> list[list]:
     j = _get_json(
         "https://www.okx.com/api/v5/market/candles",
         params={"instId": inst_id, "bar": bar, "limit": str(limit)},
-        timeout=20,
+        timeout=8,
     )
     # OKX returns newest first: [ts, o, h, l, c, vol, volCcy, volCcyQuote, confirm]
     return list((j or {}).get("data") or [])
@@ -199,10 +224,23 @@ def _okx_funding(inst_id_swap: str) -> dict:
     j = _get_json(
         "https://www.okx.com/api/v5/public/funding-rate",
         params={"instId": inst_id_swap},
-        timeout=15,
+        timeout=8,
     )
     rows = (j or {}).get("data") or []
     return rows[0] if rows else {}
+
+
+def _binance_get_json(path: str, *, params: dict | None = None, futures: bool = False) -> Any:
+    """Try China-reachable vision host first, then the global main site."""
+    bases = binance_fapi_bases() if futures else binance_spot_bases()
+    errors: list[str] = []
+    for base in bases:
+        try:
+            return _get_json(base + path, params=params, timeout=10)
+        except Exception as e:  # noqa: BLE001
+            errors.append(f"{base}:{type(e).__name__}")
+            continue
+    raise RuntimeError("binance unreachable: " + "; ".join(errors))
 
 
 # ── Binance helpers ───────────────────────────────────────────
@@ -233,33 +271,28 @@ def _binance_bar(bar: str) -> str:
 
 
 def _binance_ticker(symbol: str) -> dict:
-    j = _get_json(
-        "https://api.binance.com/api/v3/ticker/24hr",
-        params={"symbol": symbol},
-        timeout=15,
-    )
+    j = _binance_get_json("/api/v3/ticker/24hr", params={"symbol": symbol})
     return j if isinstance(j, dict) else {}
 
 
 def _binance_klines(symbol: str, bar: str = "1D", limit: int = 120) -> list[list]:
-    j = _get_json(
-        "https://api.binance.com/api/v3/klines",
+    j = _binance_get_json(
+        "/api/v3/klines",
         params={
             "symbol": symbol,
             "interval": _binance_bar(bar),
             "limit": str(max(1, min(int(limit), 1000))),
         },
-        timeout=20,
     )
     # Binance returns oldest → newest: [openTime, o, h, l, c, volume, closeTime, quoteVol, ...]
     return list(j) if isinstance(j, list) else []
 
 
 def _binance_funding(symbol_perp: str) -> dict:
-    j = _get_json(
-        "https://fapi.binance.com/fapi/v1/premiumIndex",
+    j = _binance_get_json(
+        "/fapi/v1/premiumIndex",
         params={"symbol": symbol_perp},
-        timeout=15,
+        futures=True,
     )
     return j if isinstance(j, dict) else {}
 

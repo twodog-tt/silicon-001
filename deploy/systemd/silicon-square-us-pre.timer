@@ -1,0 +1,11 @@
+[Unit]
+Description=silicon-001 US premarket Square post (09:00 America/New_York)
+
+[Timer]
+OnCalendar=Mon..Fri *-*-* 09:00:00 America/New_York
+Persistent=true
+AccuracySec=30s
+Unit=silicon-square@us-pre.service
+
+[Install]
+WantedBy=timers.target

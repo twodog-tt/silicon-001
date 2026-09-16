@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import time
 from datetime import datetime
 from pathlib import Path
@@ -156,14 +157,19 @@ def _resolve_cover(
     fact: str,
     fallback: Path | None,
 ) -> Path:
+    """Default: server-side matplotlib PNG (no tokens). DashScope only if SQUARE_AI_COVER=1."""
     dest.parent.mkdir(parents=True, exist_ok=True)
-    try:
-        return generate_cover_png(cover_prompt(pair=pair, session=session, fact=fact), dest)
-    except Exception as exc:
-        print(f"[cover] DashScope failed ({type(exc).__name__}: {exc}); fallback PNG")
-        if fallback and Path(fallback).is_file():
-            return Path(fallback)
-        raise
+    chart = Path(fallback) if fallback else None
+    if _truthy("SQUARE_AI_COVER"):
+        try:
+            return generate_cover_png(cover_prompt(pair=pair, session=session, fact=fact), dest)
+        except Exception as exc:
+            print(f"[cover] DashScope failed ({type(exc).__name__}: {exc}); using chart PNG")
+    if chart and chart.is_file():
+        if chart.resolve() != dest.resolve():
+            shutil.copy2(chart, dest)
+        return dest
+    raise RuntimeError("missing analysis PNG for Square cover")
 
 
 def _maybe_publish(

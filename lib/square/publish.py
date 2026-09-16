@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from lib.binance_square_playbook import build_article_publish_payload
+from lib.http_proxy import urlopen_square
 
 BASE_V1 = "https://www.binance.com/bapi/composite/v1/public/pgc/openApi"
 BASE_V2 = "https://www.binance.com/bapi/composite/v2/public/pgc/openApi"
@@ -41,7 +42,7 @@ def _api(key: str, base: str, endpoint: str, body: dict) -> dict:
         method="POST",
     )
     try:
-        with urllib.request.urlopen(req, timeout=90) as resp:
+        with urlopen_square(req, timeout=90) as resp:
             raw = resp.read().decode("utf-8", errors="replace")
     except urllib.error.HTTPError as exc:
         detail = exc.read().decode("utf-8", errors="replace")
@@ -63,7 +64,7 @@ def upload_image(path: Path, *, key: str | None = None) -> str:
         method="PUT",
         headers={"Content-Type": ctype},
     )
-    with urllib.request.urlopen(put, timeout=120) as resp:
+    with urlopen_square(put, timeout=120) as resp:
         if resp.status not in (200, 201, 204):
             raise SystemExit(f"image upload failed: {resp.status}")
     for _ in range(12):
